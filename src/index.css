@@ -1,0 +1,72 @@
+@import url('https://fonts.googleapis.com/css2?family=Alegreya:wght@500;700&family=Manrope:wght@400;500;700&display=swap');
+
+:root {
+  --bg: #d2c2a1;
+  --bg-deep: #90744c;
+  --panel-noise:
+    radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.18), transparent 24%),
+    radial-gradient(circle at 80% 0%, rgba(128, 89, 43, 0.12), transparent 22%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(93, 62, 31, 0.06));
+  --ink: #55402a;
+  --ink-soft: #80684e;
+  --ink-strong: #2f2216;
+  --accent: #b76c37;
+  --accent-deep: #754623;
+  --edge: rgba(86, 59, 30, 0.22);
+  font-family: 'Manrope', sans-serif;
+  line-height: 1.5;
+  color: var(--ink);
+  background:
+    radial-gradient(circle at top, rgba(255, 246, 224, 0.75), transparent 35%),
+    linear-gradient(180deg, rgba(130, 104, 63, 0.3), transparent 14%),
+    linear-gradient(135deg, #d7c59d, #b79c70 58%, #8b6f4a);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  margin: 0;
+  font-family: 'Alegreya', serif;
+  color: var(--ink-strong);
+  line-height: 1.05;
+}
+
+h1 {
+  font-size: clamp(2.6rem, 4vw, 4.8rem);
+}
+
+h2 {
+  font-size: clamp(1.4rem, 2vw, 2.2rem);
+}
+
+p {
+  margin: 0;
+}
+
+a {
+  color: inherit;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
