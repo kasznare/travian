@@ -34,6 +34,8 @@ import {
   SETTLER_BY_TRIBE,
   TRIBE_LABEL,
   UNIT_DEFINITIONS,
+  officialBuildingById,
+  type ResourceKey,
   type Tribe,
 } from './game/rules'
 import {
@@ -58,6 +60,16 @@ interface SceneSlotPosition {
   top: number
 }
 
+interface BuildLevelInfo {
+  cost: {
+    wood: number
+    clay: number
+    iron: number
+    crop: number
+  }
+  time: number
+}
+
 function createRadialLayout(
   count: number,
   radiusX: number,
@@ -77,6 +89,47 @@ function createRadialLayout(
 
 const FIELD_LAYOUT = createRadialLayout(18, 39, 36, 50, 52)
 const CENTER_LAYOUT = createRadialLayout(12, 30, 26, 50, 54)
+const FIELD_CLUSTER_LAYOUT: Record<ResourceKey, { className: string; positions: SceneSlotPosition[] }> = {
+  wood: {
+    className: 'wood-cluster',
+    positions: [
+      { left: 24, top: 56 },
+      { left: 46, top: 26 },
+      { left: 70, top: 48 },
+      { left: 48, top: 78 },
+    ],
+  },
+  clay: {
+    className: 'clay-cluster',
+    positions: [
+      { left: 18, top: 42 },
+      { left: 39, top: 22 },
+      { left: 64, top: 28 },
+      { left: 78, top: 54 },
+      { left: 48, top: 72 },
+    ],
+  },
+  iron: {
+    className: 'iron-cluster',
+    positions: [
+      { left: 22, top: 60 },
+      { left: 42, top: 30 },
+      { left: 68, top: 42 },
+      { left: 54, top: 74 },
+    ],
+  },
+  crop: {
+    className: 'crop-cluster',
+    positions: [
+      { left: 17, top: 36 },
+      { left: 36, top: 62 },
+      { left: 30, top: 24 },
+      { left: 62, top: 24 },
+      { left: 70, top: 60 },
+      { left: 85, top: 36 },
+    ],
+  },
+}
 
 interface SaveMeta {
   savedAt: number
@@ -169,6 +222,34 @@ function getFieldResourceKey(gid: 1 | 2 | 3 | 4): (typeof RESOURCE_KEYS)[number]
 
 function formatResourceStock(stock: { wood: number; clay: number; iron: number; crop: number }): string {
   return `${quantityLabel(stock.wood)}/${quantityLabel(stock.clay)}/${quantityLabel(stock.iron)}/${quantityLabel(stock.crop)}`
+}
+
+function getBuildLevelInfo(buildingGid: number, level: number): BuildLevelInfo | null {
+  const building = officialBuildingById[buildingGid]
+  if (!building) return null
+  const levelData = (building.levelData as Record<
+    string,
+    | {
+        resourceCost: {
+          r1: number
+          r2: number
+          r3: number
+          r4: number
+        }
+        buildingTime: number
+      }
+    | undefined
+  >)[String(level)]
+  if (!levelData) return null
+  return {
+    cost: {
+      wood: levelData.resourceCost.r1,
+      clay: levelData.resourceCost.r2,
+      iron: levelData.resourceCost.r3,
+      crop: levelData.resourceCost.r4,
+    },
+    time: levelData.buildingTime,
+  }
 }
 
 function tileStateClass(tile: Tile, selected: boolean, occupiedByHuman: boolean): string {
@@ -456,10 +537,17 @@ function App() {
   const selectedCenterSlot =
     selectedVillage.centerSlots.find((slot) => slot.id === selectedCenterSlotId) ?? selectedVillage.centerSlots[0]
   const selectedFieldResourceKey = getFieldResourceKey(selectedFieldSlot.gid)
+  const fieldSlotsByResource: Record<ResourceKey, typeof selectedVillage.fieldSlots> = {
+    wood: selectedVillage.fieldSlots.filter((slot) => slot.gid === 1),
+    clay: selectedVillage.fieldSlots.filter((slot) => slot.gid === 2),
+    iron: selectedVillage.fieldSlots.filter((slot) => slot.gid === 3),
+    crop: selectedVillage.fieldSlots.filter((slot) => slot.gid === 4),
+  }
   const selectedCenterOptions = buildOptions.filter((option) => option.slotId === selectedCenterSlot.id)
   const selectedCenterUpgrade = selectedCenterSlot.buildingGid
     ? selectedCenterOptions.find((option) => option.gid === selectedCenterSlot.buildingGid) ?? null
     : null
+  const selectedFieldUpgrade = getBuildLevelInfo(selectedFieldSlot.gid, selectedFieldSlot.level + 1)
   const selectedFieldQueue =
     Object.values(selectedVillage.buildQueues).find((queue) => queue?.targetSlotId === selectedFieldSlot.id) ?? null
   const selectedCenterQueue =
@@ -484,6 +572,12 @@ function App() {
         completeAt: queue!.completeAt,
       })),
   ].sort((left, right) => left.completeAt - right.completeAt)
+  const selectedVillageTroops = Object.entries(selectedVillage.units)
+    .filter(([, count]) => count > 0)
+    .sort(([, left], [, right]) => right - left)
+  const selectedVillageTroopTotal = selectedVillageTroops.reduce((total, [, count]) => total + count, 0)
+  const selectedVillageGarrison = selectedVillageTroops.slice(0, 4)
+  const recentChronicle = game.chronicle.slice(0, 2)
   const activeFocusedTileId = focusedTileId || selectedVillage.tileId
   const viewportTiles = getTileViewport(game, activeFocusedTileId, mapRadius)
   const worldOverviewTiles = getTileViewport(game, WORLD_CENTER_TILE_ID, game.mapRadius)
@@ -648,6 +742,7 @@ function App() {
   const humanReports = game.reports.filter(
     (report) => report.attackerId === humanPlayer.id || report.defenderId === humanPlayer.id || !report.defenderId,
   )
+  const immersiveSettlement = tab === 'settlement' && settlementView === 'fields'
 
   const applyGameUpdate = (updater: (current: GameState) => GameState) => {
     commitGame(updater(game))
@@ -708,26 +803,325 @@ function App() {
     applyGameUpdate((current) => recallCommand(current, commandId))
   }
 
-  return (
-    <main className="shell">
-      <header className="topbar">
-        <div className="topbar-block">
-          <p className="eyebrow">World clock</p>
-          <h1>{formatWorldTime(game.now)}</h1>
+  const renderImmersiveSettlement = () => (
+    <section className="legends-settlement">
+      <div className="legends-stage">
+        <div className="scene-mode-switch">
+          <button
+            className={`mode-pill ${settlementView === 'fields' ? 'active' : ''}`}
+            onClick={() => setSettlementView('fields')}
+          >
+            Resource fields
+          </button>
+          <button
+            className={`mode-pill ${settlementView === 'center' ? 'active' : ''}`}
+            onClick={() => setSettlementView('center')}
+          >
+            Village center
+          </button>
         </div>
-        <div className="topbar-block grow">
-          <div className="resource-strip">
-            {RESOURCE_KEYS.map((key) => (
-              <div className="resource-pill" key={key}>
-                <span className="resource-key">{key}</span>
-                <strong>{quantityLabel(selectedVillage.resources[key])}</strong>
-                <small>{quantityLabel(villageSummary.storage[key])}</small>
+
+        <aside className="scene-overlay-column left">
+          <article className="overlay-card">
+            <div className="overlay-card-header">
+              <p className="eyebrow">Inbox</p>
+              <span>{recentChronicle.length}</span>
+            </div>
+            <div className="overlay-feed">
+              {recentChronicle.map((entry) => (
+                <div className="overlay-feed-row" key={entry.id}>
+                  <strong>{formatWorldTime(entry.createdAt)}</strong>
+                  <span>{entry.text}</span>
+                </div>
+              ))}
+            </div>
+          </article>
+
+          <article className="overlay-card">
+            <p className="eyebrow">Village tools</p>
+            <div className="overlay-actions">
+              <button className="secondary-button" onClick={persistCurrentGame}>
+                Save
+              </button>
+              <button className="secondary-button" onClick={exportCurrentGame}>
+                Export
+              </button>
+              <button className="secondary-button" onClick={openImportPicker}>
+                Import
+              </button>
+            </div>
+            <button className="ghost-button legend-link" onClick={() => setTab('reports')}>
+              Open reports
+            </button>
+          </article>
+
+          <article className="overlay-card">
+            <div className="overlay-card-header">
+              <p className="eyebrow">Movements</p>
+              <span>{movementCards.length}</span>
+            </div>
+            <div className="overlay-feed">
+              {movementCards.slice(0, 3).map((entry) => (
+                <div className="overlay-feed-row" key={entry.command.id}>
+                  <strong>
+                    {entry.status} {entry.command.kind}
+                  </strong>
+                  <span>{entry.origin} → {entry.destination}</span>
+                  <span>{entry.eta}</span>
+                </div>
+              ))}
+              {!movementCards.length ? <span className="muted">No active troop movements.</span> : null}
+            </div>
+          </article>
+        </aside>
+
+        <aside className="scene-overlay-column right">
+          <article className="overlay-card village-summary-card">
+            <p className="eyebrow">Village</p>
+            <h2>{selectedVillage.name}</h2>
+            <div className="overlay-stat-row">
+              <span>Population</span>
+              <strong>{villageSummary.population.toLocaleString()}</strong>
+            </div>
+            <div className="overlay-stat-row">
+              <span>Loyalty</span>
+              <strong>{Math.round(villageSummary.loyalty)}%</strong>
+            </div>
+            <div className="overlay-stat-row">
+              <span>Culture / day</span>
+              <strong>{villageSummary.culturePointsPerDay.toLocaleString()}</strong>
+            </div>
+          </article>
+
+          <article className="overlay-card">
+            <p className="eyebrow">Production / hour</p>
+            <div className="production-card-list">
+              {RESOURCE_KEYS.map((key) => (
+                <div className="production-row" key={key}>
+                  <ResourceIllustration kind={key} className="production-art" />
+                  <span>{titleCase(key)}</span>
+                  <strong>{quantityLabel(villageSummary.production[key])}</strong>
+                </div>
+              ))}
+            </div>
+          </article>
+
+          <article className="overlay-card">
+            <div className="overlay-card-header">
+              <p className="eyebrow">Villages</p>
+              <span>{humanVillages.length}</span>
+            </div>
+            <div className="overlay-village-list">
+              {humanVillages.map((village) => (
+                <button
+                  key={village.id}
+                  className={`overlay-village-button ${village.id === selectedVillage.id ? 'active' : ''}`}
+                  onClick={() => {
+                    applyGameUpdate((current) => selectVillage(current, village.id))
+                    setFocusedTileId(village.tileId)
+                  }}
+                >
+                  <strong>{village.name}</strong>
+                  <span>
+                    {village.x},{village.y}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </article>
+
+          <article className="overlay-card">
+            <div className="overlay-card-header">
+              <p className="eyebrow">Garrison</p>
+              <span>{selectedVillageTroopTotal}</span>
+            </div>
+            <div className="overlay-feed">
+              {selectedVillageGarrison.map(([unitId, count]) => (
+                <div className="overlay-feed-row" key={unitId}>
+                  <strong>{UNIT_DEFINITIONS[unitId].name}</strong>
+                  <span>{quantityLabel(count)} stationed</span>
+                </div>
+              ))}
+              {!selectedVillageGarrison.length ? <span className="muted">No troops stationed here yet.</span> : null}
+            </div>
+          </article>
+        </aside>
+
+        <div className="legends-landscape">
+          <div className="village-heart">
+            <div className="village-heart-ring" />
+            <div className="village-heart-core">
+              <BuildingIllustration kind="hall" className="village-heart-art" />
+              <strong>{selectedVillage.name}</strong>
+              <span>{RESOURCE_PATTERNS[selectedVillage.patternIndex].label}</span>
+            </div>
+          </div>
+
+          {RESOURCE_KEYS.map((resourceKey) => {
+            const cluster = FIELD_CLUSTER_LAYOUT[resourceKey]
+            const slots = fieldSlotsByResource[resourceKey]
+            return (
+              <div className={`resource-cluster ${cluster.className}`} key={resourceKey}>
+                <div className={`resource-terrain terrain-${resourceKey}`} />
+                {slots.map((slot, index) => {
+                  const position = cluster.positions[index % cluster.positions.length]
+                  return (
+                    <button
+                      key={slot.id}
+                      className={`field-node resource-${resourceKey} ${
+                        selectedFieldSlot.id === slot.id ? 'active' : ''
+                      } ${slot.level > 0 ? 'built' : 'vacant'}`}
+                      style={{ left: `${position.left}%`, top: `${position.top}%` }}
+                      onClick={() => setSelectedFieldSlotId(slot.id)}
+                      title={`${BUILDING_METADATA[slot.gid].name} level ${slot.level}`}
+                    >
+                      <ResourceIllustration kind={resourceKey} className="field-node-art" />
+                      {slot.level > 0 ? <span className="field-node-level">{slot.level}</span> : null}
+                    </button>
+                  )
+                })}
               </div>
-            ))}
+            )
+          })}
+
+          <div className="scene-tooltip">
+            <div className="scene-tooltip-head">
+              <ResourceIllustration kind={selectedFieldResourceKey} className="scene-tooltip-art" />
+              <div>
+                <strong>
+                  {BUILDING_METADATA[selectedFieldSlot.gid].name} level {selectedFieldSlot.level}
+                </strong>
+                <span>
+                  {titleCase(selectedFieldResourceKey)} field · slot {selectedFieldSlot.id.replace('field-', '')}
+                </span>
+              </div>
+            </div>
+            {selectedFieldUpgrade ? (
+              <>
+                <div className="tooltip-cost-grid">
+                  {RESOURCE_KEYS.map((key) => (
+                    <div className="tooltip-cost-chip" key={key}>
+                      <span>{titleCase(key).slice(0, 2)}</span>
+                      <strong>{quantityLabel(selectedFieldUpgrade.cost[key])}</strong>
+                    </div>
+                  ))}
+                </div>
+                <div className="scene-tooltip-meta">
+                  <span>Build time {formatDuration(selectedFieldUpgrade.time)}</span>
+                  <span>
+                    Output {quantityLabel(villageSummary.production[selectedFieldResourceKey])} / h
+                  </span>
+                </div>
+              </>
+            ) : (
+              <p className="muted">This field has reached its current cap.</p>
+            )}
+            {selectedFieldQueue ? (
+              <p className="scene-tooltip-note">
+                Construction underway, done in {formatDuration(Math.max(0, selectedFieldQueue.completeAt - game.now))}
+              </p>
+            ) : null}
+            <button
+              className="primary-button scene-upgrade-button"
+              onClick={() =>
+                applyGameUpdate((current) => queueFieldUpgrade(current, selectedVillage.id, selectedFieldSlot.id))
+              }
+            >
+              Upgrade field
+            </button>
           </div>
         </div>
-        <div className="topbar-block controls">
-          <div className="skip-grid">
+
+        <div className="construction-banner">
+          <div className="construction-banner-header">
+            <p className="eyebrow">Construction</p>
+            <span>{selectedVillageOrders.length} active</span>
+          </div>
+          <div className="construction-banner-list">
+            {selectedVillageOrders.slice(0, 4).map((order) => (
+              <div className="construction-banner-row" key={order.id}>
+                <strong>{order.label}</strong>
+                <span>{order.detail}</span>
+                <span>{order.eta}</span>
+              </div>
+            ))}
+            {!selectedVillageOrders.length ? <span className="muted">No active construction or training orders.</span> : null}
+          </div>
+        </div>
+      </div>
+    </section>
+  )
+
+  return (
+    <main className={`shell ${immersiveSettlement ? 'immersive-shell' : ''}`}>
+      <header className={`topbar ${immersiveSettlement ? 'legends-topbar' : ''}`}>
+        <div className={`topbar-block ${immersiveSettlement ? 'hero-block' : ''}`}>
+          {immersiveSettlement ? (
+            <div className="hero-cluster">
+              <div className="hero-medallion">
+                <div className="hero-avatar">{humanPlayer.name.slice(0, 1).toUpperCase()}</div>
+                <span className="hero-level">{humanVillages.length}</span>
+              </div>
+              <div className="hero-copy">
+                <p className="eyebrow">Village view</p>
+                <h1>{formatWorldTime(game.now)}</h1>
+                <span>{TRIBE_LABEL[humanPlayer.tribe]}</span>
+              </div>
+            </div>
+          ) : (
+            <>
+              <p className="eyebrow">World clock</p>
+              <h1>{formatWorldTime(game.now)}</h1>
+            </>
+          )}
+        </div>
+        <div className={`topbar-block grow ${immersiveSettlement ? 'hud-center-block' : ''}`}>
+          {immersiveSettlement ? (
+            <div className="hud-main-stack">
+              <nav className="hud-nav-strip">
+                {(['settlement', 'map', 'army', 'reports'] as const).map((tabId) => (
+                  <button
+                    key={`hud-${tabId}`}
+                    className={`hud-nav-button ${tab === tabId ? 'active' : ''}`}
+                    onClick={() => setTab(tabId)}
+                  >
+                    {tabId === 'settlement' ? (
+                      <BuildingIllustration kind="hall" className="hud-nav-art" />
+                    ) : tabId === 'map' ? (
+                      <TileIllustration kind="empty" className="hud-nav-art" />
+                    ) : tabId === 'army' ? (
+                      <BuildingIllustration kind="military" className="hud-nav-art" />
+                    ) : (
+                      <BuildingIllustration kind="research" className="hud-nav-art" />
+                    )}
+                    <span>{tabId}</span>
+                  </button>
+                ))}
+              </nav>
+              <div className="resource-strip legends-resource-strip">
+                {RESOURCE_KEYS.map((key) => (
+                  <div className="resource-pill" key={key}>
+                    <span className="resource-key">{key}</span>
+                    <strong>{quantityLabel(selectedVillage.resources[key])}</strong>
+                    <small>{quantityLabel(villageSummary.storage[key])} cap</small>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="resource-strip">
+              {RESOURCE_KEYS.map((key) => (
+                <div className="resource-pill" key={key}>
+                  <span className="resource-key">{key}</span>
+                  <strong>{quantityLabel(selectedVillage.resources[key])}</strong>
+                  <small>{quantityLabel(villageSummary.storage[key])}</small>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        <div className={`topbar-block controls ${immersiveSettlement ? 'legends-controls' : ''}`}>
+          <div className={`skip-grid ${immersiveSettlement ? 'legends-skip-grid' : ''}`}>
             {[900, 3600, 21600, 86400].map((seconds) => (
               <button
                 key={seconds}
@@ -758,7 +1152,8 @@ function App() {
         </div>
       </header>
 
-      <section className="frame">
+      <section className={`frame ${immersiveSettlement ? 'immersive-frame' : ''}`}>
+        {!immersiveSettlement ? (
         <aside className="sidebar">
           <div className="panel">
             <p className="eyebrow">Ruler</p>
@@ -904,8 +1299,10 @@ function App() {
             </div>
           </div>
         </aside>
+        ) : null}
 
-        <section className="content">
+        <section className={`content ${immersiveSettlement ? 'immersive-content' : ''}`}>
+          {!immersiveSettlement ? (
           <nav className="tab-row">
             {(['settlement', 'map', 'army', 'reports'] as const).map((tabId) => (
               <button
@@ -917,8 +1314,12 @@ function App() {
               </button>
             ))}
           </nav>
+          ) : null}
 
           {tab === 'settlement' ? (
+            immersiveSettlement ? (
+              renderImmersiveSettlement()
+            ) : (
             <section className="content-grid">
               <div className="panel wide">
                 <div className="panel-header">
@@ -1224,6 +1625,7 @@ function App() {
                 </div>
               </div>
             </section>
+            )
           ) : null}
 
           {tab === 'map' ? (

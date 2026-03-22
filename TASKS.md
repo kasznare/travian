@@ -22,4 +22,5 @@ Last updated: 2026-03-21
 - Command system depth in this pass: outbound troop and shipment commands can now be recalled, with automated coverage and UI controls.
 - Presentation pass in progress: replacing list-style field and center grids with spatial village scenes, and promoting the world overview into a larger atlas view.
 - Presentation polish in progress: compact illustrated slot tokens, map tile art, and hover cleanup so the new spatial views feel stable instead of card-heavy.
+- Fields-view visual pass now targets a closer Travian-like composition: framed HUD, scenic field screen, overlay village cards, grouped resource clusters, and in-scene upgrade tooltip.
 - After the test harness is stable, the next implementation priority is command/report depth plus AI personalities.
