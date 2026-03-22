@@ -742,7 +742,7 @@ function App() {
   const humanReports = game.reports.filter(
     (report) => report.attackerId === humanPlayer.id || report.defenderId === humanPlayer.id || !report.defenderId,
   )
-  const immersiveSettlement = tab === 'settlement' && settlementView === 'fields'
+  const immersiveMode = tab === 'settlement' || tab === 'map'
 
   const applyGameUpdate = (updater: (current: GameState) => GameState) => {
     commitGame(updater(game))
@@ -803,6 +803,326 @@ function App() {
     applyGameUpdate((current) => recallCommand(current, commandId))
   }
 
+  const immersiveSceneColumns = (
+    <>
+      <aside className="scene-overlay-column left">
+        <article className="overlay-card">
+          <div className="overlay-card-header">
+            <p className="eyebrow">Inbox</p>
+            <span>{recentChronicle.length}</span>
+          </div>
+          <div className="overlay-feed">
+            {recentChronicle.map((entry) => (
+              <div className="overlay-feed-row" key={entry.id}>
+                <strong>{formatWorldTime(entry.createdAt)}</strong>
+                <span>{entry.text}</span>
+              </div>
+            ))}
+          </div>
+        </article>
+
+        <article className="overlay-card">
+          <p className="eyebrow">Link list</p>
+          <div className="overlay-feed">
+            <div className="overlay-feed-row">
+              <strong>Save to device</strong>
+              <span>{saveNotice}</span>
+            </div>
+            <div className="overlay-actions">
+              <button className="secondary-button" onClick={persistCurrentGame}>
+                Save
+              </button>
+              <button className="secondary-button" onClick={exportCurrentGame}>
+                Export
+              </button>
+              <button className="secondary-button" onClick={openImportPicker}>
+                Import
+              </button>
+            </div>
+          </div>
+        </article>
+      </aside>
+
+      <aside className="scene-overlay-column right">
+        <article className="overlay-card village-name-card">
+          <p className="eyebrow">Village</p>
+          <span className="village-name-small">{humanPlayer.name}</span>
+          <h2>{selectedVillage.name}</h2>
+          <div className="overlay-stat-row">
+            <span>Population</span>
+            <strong>{villageSummary.population.toLocaleString()}</strong>
+          </div>
+          <div className="overlay-stat-row">
+            <span>Loyalty</span>
+            <strong>{Math.round(villageSummary.loyalty)}%</strong>
+          </div>
+          <div className="overlay-stat-row">
+            <span>Culture / day</span>
+            <strong>{villageSummary.culturePointsPerDay.toLocaleString()}</strong>
+          </div>
+        </article>
+
+        <article className="overlay-card">
+          <div className="overlay-card-header">
+            <p className="eyebrow">Villages</p>
+            <span>{humanVillages.length}</span>
+          </div>
+          <div className="overlay-village-list">
+            {humanVillages.map((village) => (
+              <button
+                key={village.id}
+                className={`overlay-village-button ${village.id === selectedVillage.id ? 'active' : ''}`}
+                onClick={() => {
+                  applyGameUpdate((current) => selectVillage(current, village.id))
+                  setFocusedTileId(village.tileId)
+                }}
+              >
+                <strong>{village.name}</strong>
+                <span>
+                  {village.x},{village.y}
+                </span>
+              </button>
+            ))}
+          </div>
+        </article>
+
+        <article className="overlay-card">
+          <div className="overlay-card-header">
+            <p className="eyebrow">Tasks</p>
+            <span>{selectedVillageOrders.length}</span>
+          </div>
+          <div className="overlay-feed">
+            {selectedVillageOrders.slice(0, 3).map((order) => (
+              <div className="overlay-feed-row" key={order.id}>
+                <strong>{order.label}</strong>
+                <span>{order.detail}</span>
+                <span>{order.eta}</span>
+              </div>
+            ))}
+            {!selectedVillageOrders.length ? <span className="muted">No active construction or training orders.</span> : null}
+          </div>
+        </article>
+      </aside>
+    </>
+  )
+
+  const renderMapActionContent = () => {
+    if (!focusedTile) {
+      return <p className="muted">No tile selected.</p>
+    }
+
+    if (focusedVillage && focusedVillage.ownerId === humanPlayer.id) {
+      return (
+        <>
+          <div className="queue-list">
+            <div className="queue-card">
+              <strong>{focusedVillage.name}</strong>
+              <span>Population {focusedVillageSummary ? focusedVillageSummary.population.toLocaleString() : '0'}</span>
+              <span>
+                Merchants {focusedVillageSummary ? focusedVillageSummary.merchants.available : 0}/
+                {focusedVillageSummary ? focusedVillageSummary.merchants.total : 0}
+              </span>
+            </div>
+          </div>
+          {focusedVillage.id !== selectedVillage.id ? (
+            <>
+              <div className="action-stack">
+                <button
+                  className="secondary-button"
+                  onClick={() => {
+                    applyGameUpdate((current) => selectVillage(current, focusedVillage.id))
+                    setFocusedTileId(focusedVillage.tileId)
+                  }}
+                >
+                  Select this village
+                </button>
+              </div>
+
+              <div className="map-actions">
+                <div className="shipment-grid">
+                  {RESOURCE_KEYS.map((key) => (
+                    <label key={key}>
+                      <span>
+                        {key} ({quantityLabel(selectedVillage.resources[key])})
+                      </span>
+                      <input
+                        value={shipmentDraft[getShipmentKey(selectedVillage.id, focusedVillage.id, key)] ?? '0'}
+                        onChange={(event) =>
+                          setShipmentDraft((current) => ({
+                            ...current,
+                            [getShipmentKey(selectedVillage.id, focusedVillage.id, key)]: event.target.value,
+                          }))
+                        }
+                        inputMode="numeric"
+                      />
+                    </label>
+                  ))}
+                </div>
+                <div className="queue-list">
+                  <div className="queue-card">
+                    <strong>Shipment</strong>
+                    <span>{quantityLabel(shipmentTotal)} total resources</span>
+                    <span>
+                      {shipmentMerchantsNeeded} / {selectedMarketplace.available} merchants needed
+                    </span>
+                  </div>
+                </div>
+                {shipmentPlan && shipmentBlockers.length ? (
+                  <div className="report-list">
+                    {shipmentBlockers.map((blocker) => (
+                      <article className="report-card" key={blocker}>
+                        <p>{blocker}</p>
+                      </article>
+                    ))}
+                  </div>
+                ) : null}
+                <div className="action-stack">
+                  <button
+                    className="primary-button"
+                    disabled={!shipmentPlan || shipmentBlockers.length > 0}
+                    onClick={sendShipment}
+                  >
+                    Send resources
+                  </button>
+                  <button className="ghost-button" onClick={clearShipmentPlan}>
+                    Clear shipment
+                  </button>
+                </div>
+              </div>
+            </>
+          ) : (
+            <p className="muted">This is your current active village.</p>
+          )}
+        </>
+      )
+    }
+
+    if (focusedVillage) {
+      return (
+        <>
+          <p className="muted">Owned by {game.players[focusedVillage.ownerId].name}</p>
+          <div className="queue-list">
+            <div className="queue-card">
+              <strong>{focusedVillage.name}</strong>
+              <span>Population {focusedVillageSummary ? focusedVillageSummary.population.toLocaleString() : '0'}</span>
+              <span>
+                Defense {Math.round(focusedVillageSummary ? focusedVillageSummary.military.defense : 0).toLocaleString()}
+              </span>
+            </div>
+          </div>
+          <div className="map-actions">
+            <div className="dispatch-grid">
+              {selectedVillageDispatchUnits.map((entry) => (
+                <label key={entry.unit.id}>
+                  <span>
+                    {entry.unit.name} ({entry.available})
+                  </span>
+                  <input
+                    value={dispatchUnits[getDispatchKey(selectedVillage.id, entry.unit.id)] ?? '0'}
+                    onChange={(event) =>
+                      setDispatchUnits((current) => ({
+                        ...current,
+                        [getDispatchKey(selectedVillage.id, entry.unit.id)]: event.target.value,
+                      }))
+                    }
+                    inputMode="numeric"
+                  />
+                </label>
+              ))}
+            </div>
+            <div className="queue-list">
+              <div className="queue-card">
+                <strong>Selected troops</strong>
+                <span>{selectedDispatchCount.toLocaleString()} units</span>
+                <span>{selectedDispatchPower.toLocaleString()} attack</span>
+              </div>
+            </div>
+            {conquestPreview?.blockers.length ? (
+              <div className="report-list">
+                {conquestPreview.blockers.map((blocker) => (
+                  <article className="report-card" key={blocker}>
+                    <p>{blocker}</p>
+                  </article>
+                ))}
+              </div>
+            ) : null}
+            <div className="action-stack">
+              <button
+                className="secondary-button"
+                disabled={focusedVillage.ownerId === humanPlayer.id || selectedDispatchPower <= 0}
+                onClick={() => sendStrike('raid')}
+              >
+                Raid
+              </button>
+              <button
+                className="primary-button"
+                disabled={focusedVillage.ownerId === humanPlayer.id || selectedDispatchPower <= 0}
+                onClick={() => sendStrike('attack')}
+              >
+                Attack
+              </button>
+              <button
+                className="primary-button"
+                disabled={
+                  focusedVillage.ownerId === humanPlayer.id ||
+                  selectedDispatchPower <= 0 ||
+                  !conquestPreview?.allowed
+                }
+                onClick={() => sendStrike('conquer')}
+              >
+                Conquer
+              </button>
+              <button className="ghost-button" onClick={clearDispatchPlan}>
+                Clear selection
+              </button>
+            </div>
+          </div>
+        </>
+      )
+    }
+
+    return (
+      <>
+        <p className="muted">Unoccupied terrain, ready for expansion.</p>
+        <div className="queue-list">
+          <div className="queue-card">
+            <strong>Settlers</strong>
+            <span>{expansionStatus.readySettlers} / 3 ready</span>
+          </div>
+          <div className="queue-card">
+            <strong>Expansion slots</strong>
+            <span>
+              {expansionStatus.usedSlots}/{expansionStatus.totalSlots} used
+            </span>
+          </div>
+          <div className="queue-card">
+            <strong>Culture points</strong>
+            <span>
+              {Math.floor(expansionStatus.culturePoints).toLocaleString()} /{' '}
+              {Math.ceil(expansionStatus.nextVillageRequirement).toLocaleString()}
+            </span>
+          </div>
+        </div>
+        {settlementBlockers.length ? (
+          <div className="report-list">
+            {settlementBlockers.map((blocker) => (
+              <article className="report-card" key={blocker}>
+                <p>{blocker}</p>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <p className="muted">Settlement convoy is ready. Founding will consume 3 settlers and 750 of each resource.</p>
+        )}
+        <div className="action-stack">
+          <button className="primary-button" disabled={settlementBlockers.length > 0} onClick={sendSettlers}>
+            Found a new village
+          </button>
+        </div>
+      </>
+    )
+  }
+
   const renderImmersiveSettlement = () => (
     <section className="legends-settlement">
       <div className="legends-stage">
@@ -821,216 +1141,220 @@ function App() {
           </button>
         </div>
 
-        <aside className="scene-overlay-column left">
-          <article className="overlay-card">
-            <div className="overlay-card-header">
-              <p className="eyebrow">Inbox</p>
-              <span>{recentChronicle.length}</span>
-            </div>
-            <div className="overlay-feed">
-              {recentChronicle.map((entry) => (
-                <div className="overlay-feed-row" key={entry.id}>
-                  <strong>{formatWorldTime(entry.createdAt)}</strong>
-                  <span>{entry.text}</span>
+        {immersiveSceneColumns}
+
+        {settlementView === 'fields' ? (
+          <>
+            <div className="legends-landscape">
+              <div className="village-heart">
+                <div className="village-heart-ring" />
+                <div className="village-heart-core">
+                  <BuildingIllustration kind="hall" className="village-heart-art" />
+                  <strong>{selectedVillage.name}</strong>
+                  <span>{RESOURCE_PATTERNS[selectedVillage.patternIndex].label}</span>
                 </div>
-              ))}
-            </div>
-          </article>
-
-          <article className="overlay-card">
-            <p className="eyebrow">Village tools</p>
-            <div className="overlay-actions">
-              <button className="secondary-button" onClick={persistCurrentGame}>
-                Save
-              </button>
-              <button className="secondary-button" onClick={exportCurrentGame}>
-                Export
-              </button>
-              <button className="secondary-button" onClick={openImportPicker}>
-                Import
-              </button>
-            </div>
-            <button className="ghost-button legend-link" onClick={() => setTab('reports')}>
-              Open reports
-            </button>
-          </article>
-
-          <article className="overlay-card">
-            <div className="overlay-card-header">
-              <p className="eyebrow">Movements</p>
-              <span>{movementCards.length}</span>
-            </div>
-            <div className="overlay-feed">
-              {movementCards.slice(0, 3).map((entry) => (
-                <div className="overlay-feed-row" key={entry.command.id}>
-                  <strong>
-                    {entry.status} {entry.command.kind}
-                  </strong>
-                  <span>{entry.origin} → {entry.destination}</span>
-                  <span>{entry.eta}</span>
-                </div>
-              ))}
-              {!movementCards.length ? <span className="muted">No active troop movements.</span> : null}
-            </div>
-          </article>
-        </aside>
-
-        <aside className="scene-overlay-column right">
-          <article className="overlay-card village-summary-card">
-            <p className="eyebrow">Village</p>
-            <h2>{selectedVillage.name}</h2>
-            <div className="overlay-stat-row">
-              <span>Population</span>
-              <strong>{villageSummary.population.toLocaleString()}</strong>
-            </div>
-            <div className="overlay-stat-row">
-              <span>Loyalty</span>
-              <strong>{Math.round(villageSummary.loyalty)}%</strong>
-            </div>
-            <div className="overlay-stat-row">
-              <span>Culture / day</span>
-              <strong>{villageSummary.culturePointsPerDay.toLocaleString()}</strong>
-            </div>
-          </article>
-
-          <article className="overlay-card">
-            <p className="eyebrow">Production / hour</p>
-            <div className="production-card-list">
-              {RESOURCE_KEYS.map((key) => (
-                <div className="production-row" key={key}>
-                  <ResourceIllustration kind={key} className="production-art" />
-                  <span>{titleCase(key)}</span>
-                  <strong>{quantityLabel(villageSummary.production[key])}</strong>
-                </div>
-              ))}
-            </div>
-          </article>
-
-          <article className="overlay-card">
-            <div className="overlay-card-header">
-              <p className="eyebrow">Villages</p>
-              <span>{humanVillages.length}</span>
-            </div>
-            <div className="overlay-village-list">
-              {humanVillages.map((village) => (
-                <button
-                  key={village.id}
-                  className={`overlay-village-button ${village.id === selectedVillage.id ? 'active' : ''}`}
-                  onClick={() => {
-                    applyGameUpdate((current) => selectVillage(current, village.id))
-                    setFocusedTileId(village.tileId)
-                  }}
-                >
-                  <strong>{village.name}</strong>
-                  <span>
-                    {village.x},{village.y}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </article>
-
-          <article className="overlay-card">
-            <div className="overlay-card-header">
-              <p className="eyebrow">Garrison</p>
-              <span>{selectedVillageTroopTotal}</span>
-            </div>
-            <div className="overlay-feed">
-              {selectedVillageGarrison.map(([unitId, count]) => (
-                <div className="overlay-feed-row" key={unitId}>
-                  <strong>{UNIT_DEFINITIONS[unitId].name}</strong>
-                  <span>{quantityLabel(count)} stationed</span>
-                </div>
-              ))}
-              {!selectedVillageGarrison.length ? <span className="muted">No troops stationed here yet.</span> : null}
-            </div>
-          </article>
-        </aside>
-
-        <div className="legends-landscape">
-          <div className="village-heart">
-            <div className="village-heart-ring" />
-            <div className="village-heart-core">
-              <BuildingIllustration kind="hall" className="village-heart-art" />
-              <strong>{selectedVillage.name}</strong>
-              <span>{RESOURCE_PATTERNS[selectedVillage.patternIndex].label}</span>
-            </div>
-          </div>
-
-          {RESOURCE_KEYS.map((resourceKey) => {
-            const cluster = FIELD_CLUSTER_LAYOUT[resourceKey]
-            const slots = fieldSlotsByResource[resourceKey]
-            return (
-              <div className={`resource-cluster ${cluster.className}`} key={resourceKey}>
-                <div className={`resource-terrain terrain-${resourceKey}`} />
-                {slots.map((slot, index) => {
-                  const position = cluster.positions[index % cluster.positions.length]
-                  return (
-                    <button
-                      key={slot.id}
-                      className={`field-node resource-${resourceKey} ${
-                        selectedFieldSlot.id === slot.id ? 'active' : ''
-                      } ${slot.level > 0 ? 'built' : 'vacant'}`}
-                      style={{ left: `${position.left}%`, top: `${position.top}%` }}
-                      onClick={() => setSelectedFieldSlotId(slot.id)}
-                      title={`${BUILDING_METADATA[slot.gid].name} level ${slot.level}`}
-                    >
-                      <ResourceIllustration kind={resourceKey} className="field-node-art" />
-                      {slot.level > 0 ? <span className="field-node-level">{slot.level}</span> : null}
-                    </button>
-                  )
-                })}
               </div>
-            )
-          })}
 
-          <div className="scene-tooltip">
-            <div className="scene-tooltip-head">
-              <ResourceIllustration kind={selectedFieldResourceKey} className="scene-tooltip-art" />
-              <div>
-                <strong>
-                  {BUILDING_METADATA[selectedFieldSlot.gid].name} level {selectedFieldSlot.level}
-                </strong>
-                <span>
-                  {titleCase(selectedFieldResourceKey)} field · slot {selectedFieldSlot.id.replace('field-', '')}
-                </span>
-              </div>
-            </div>
-            {selectedFieldUpgrade ? (
-              <>
-                <div className="tooltip-cost-grid">
-                  {RESOURCE_KEYS.map((key) => (
-                    <div className="tooltip-cost-chip" key={key}>
-                      <span>{titleCase(key).slice(0, 2)}</span>
-                      <strong>{quantityLabel(selectedFieldUpgrade.cost[key])}</strong>
+              {RESOURCE_KEYS.map((resourceKey) => {
+                const cluster = FIELD_CLUSTER_LAYOUT[resourceKey]
+                const slots = fieldSlotsByResource[resourceKey]
+                return (
+                  <div className={`resource-cluster ${cluster.className}`} key={resourceKey}>
+                    <div className={`resource-terrain terrain-${resourceKey}`} />
+                    {slots.map((slot, index) => {
+                      const position = cluster.positions[index % cluster.positions.length]
+                      return (
+                        <button
+                          key={slot.id}
+                          className={`field-node resource-${resourceKey} ${
+                            selectedFieldSlot.id === slot.id ? 'active' : ''
+                          } ${slot.level > 0 ? 'built' : 'vacant'}`}
+                          style={{ left: `${position.left}%`, top: `${position.top}%` }}
+                          onClick={() => setSelectedFieldSlotId(slot.id)}
+                          title={`${BUILDING_METADATA[slot.gid].name} level ${slot.level}`}
+                        >
+                          <ResourceIllustration kind={resourceKey} className="field-node-art" />
+                          {slot.level > 0 ? <span className="field-node-level">{slot.level}</span> : null}
+                        </button>
+                      )
+                    })}
+                  </div>
+                )
+              })}
+
+              <div className="scene-tooltip">
+                <div className="scene-tooltip-head">
+                  <ResourceIllustration kind={selectedFieldResourceKey} className="scene-tooltip-art" />
+                  <div>
+                    <strong>
+                      {BUILDING_METADATA[selectedFieldSlot.gid].name} level {selectedFieldSlot.level}
+                    </strong>
+                    <span>
+                      {titleCase(selectedFieldResourceKey)} field · slot {selectedFieldSlot.id.replace('field-', '')}
+                    </span>
+                  </div>
+                </div>
+                {selectedFieldUpgrade ? (
+                  <>
+                    <div className="tooltip-cost-grid">
+                      {RESOURCE_KEYS.map((key) => (
+                        <div className="tooltip-cost-chip" key={key}>
+                          <span>{titleCase(key).slice(0, 2)}</span>
+                          <strong>{quantityLabel(selectedFieldUpgrade.cost[key])}</strong>
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
-                <div className="scene-tooltip-meta">
-                  <span>Build time {formatDuration(selectedFieldUpgrade.time)}</span>
+                    <div className="scene-tooltip-meta">
+                      <span>Build time {formatDuration(selectedFieldUpgrade.time)}</span>
+                      <span>
+                        Output {quantityLabel(villageSummary.production[selectedFieldResourceKey])} / h
+                      </span>
+                    </div>
+                  </>
+                ) : (
+                  <p className="muted">This field has reached its current cap.</p>
+                )}
+                {selectedFieldQueue ? (
+                  <p className="scene-tooltip-note">
+                    Construction underway, done in {formatDuration(Math.max(0, selectedFieldQueue.completeAt - game.now))}
+                  </p>
+                ) : null}
+                <button
+                  className="primary-button scene-upgrade-button"
+                  onClick={() =>
+                    applyGameUpdate((current) => queueFieldUpgrade(current, selectedVillage.id, selectedFieldSlot.id))
+                  }
+                >
+                  Upgrade field
+                </button>
+              </div>
+            </div>
+
+            <div className="floating-info-card production-floating-card">
+              <p className="eyebrow">Production / hour</p>
+              <div className="floating-info-list">
+                {RESOURCE_KEYS.map((key) => (
+                  <div className="floating-info-row" key={key}>
+                    <ResourceIllustration kind={key} className="production-art" />
+                    <span>{titleCase(key)}</span>
+                    <strong>{quantityLabel(villageSummary.production[key])}</strong>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="floating-info-card troops-floating-card">
+              <div className="overlay-card-header">
+                <p className="eyebrow">Troops</p>
+                <span>{selectedVillageTroopTotal}</span>
+              </div>
+              <div className="floating-info-list">
+                {selectedVillageGarrison.map(([unitId, count]) => (
+                  <div className="floating-info-row" key={unitId}>
+                    <BuildingIllustration kind="military" className="production-art" />
+                    <span>{UNIT_DEFINITIONS[unitId].name}</span>
+                    <strong>{quantityLabel(count)}</strong>
+                  </div>
+                ))}
+                {!selectedVillageGarrison.length ? <span className="muted">No units stationed.</span> : null}
+              </div>
+            </div>
+          </>
+        ) : (
+          <div className="legends-center-landscape">
+            <div className="center-ring-water" />
+            <div className="center-ring-ground" />
+            <div className="center-paths" />
+            {selectedVillage.centerSlots.map((slot, index) => {
+              const position = CENTER_LAYOUT[index % CENTER_LAYOUT.length]
+              const buildable = buildOptions.filter((option) => option.slotId === slot.id)
+              return (
+                <button
+                  key={slot.id}
+                  className={`center-ring-node ${selectedCenterSlot.id === slot.id ? 'active' : ''} ${
+                    slot.buildingGid ? 'built' : 'empty'
+                  }`}
+                  style={{ left: `${position.left}%`, top: `${position.top}%` }}
+                  onClick={() => setSelectedCenterSlotId(slot.id)}
+                  title={slot.buildingGid ? BUILDING_METADATA[slot.buildingGid].name : 'Empty lot'}
+                >
+                  <BuildingIllustration kind={getBuildingArtKind(slot.buildingGid)} className="center-node-art" />
+                  {slot.level > 0 ? <span className="field-node-level">{slot.level}</span> : null}
+                  {!slot.buildingGid ? <span className="empty-node-count">{buildable.length}</span> : null}
+                </button>
+              )
+            })}
+            <div className="center-tooltip-card">
+              <div className="scene-tooltip-head">
+                <BuildingIllustration
+                  kind={getBuildingArtKind(selectedCenterSlot.buildingGid)}
+                  className="scene-tooltip-art"
+                />
+                <div>
+                  <strong>
+                    {selectedCenterSlot.buildingGid
+                      ? BUILDING_METADATA[selectedCenterSlot.buildingGid].name
+                      : 'Empty building lot'}
+                  </strong>
                   <span>
-                    Output {quantityLabel(villageSummary.production[selectedFieldResourceKey])} / h
+                    Slot {selectedCenterSlot.id.replace('center-', '')}
+                    {selectedCenterSlot.buildingGid ? ` · level ${selectedCenterSlot.level}` : ' · ready to build'}
                   </span>
                 </div>
-              </>
-            ) : (
-              <p className="muted">This field has reached its current cap.</p>
-            )}
-            {selectedFieldQueue ? (
-              <p className="scene-tooltip-note">
-                Construction underway, done in {formatDuration(Math.max(0, selectedFieldQueue.completeAt - game.now))}
-              </p>
-            ) : null}
-            <button
-              className="primary-button scene-upgrade-button"
-              onClick={() =>
-                applyGameUpdate((current) => queueFieldUpgrade(current, selectedVillage.id, selectedFieldSlot.id))
-              }
-            >
-              Upgrade field
-            </button>
+              </div>
+              {selectedCenterSlot.buildingGid && selectedCenterUpgrade ? (
+                <>
+                  <div className="tooltip-cost-grid">
+                    {RESOURCE_KEYS.map((key) => (
+                      <div className="tooltip-cost-chip" key={key}>
+                        <span>{titleCase(key).slice(0, 2)}</span>
+                        <strong>{quantityLabel(selectedCenterUpgrade.cost[key])}</strong>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="scene-tooltip-meta">
+                    <span>Upgrade time {formatDuration(selectedCenterUpgrade.buildTime)}</span>
+                    <span>Building level {selectedCenterSlot.level}</span>
+                  </div>
+                  <button
+                    className="primary-button scene-upgrade-button"
+                    onClick={() =>
+                      applyGameUpdate((current) =>
+                        queueCenterBuild(
+                          current,
+                          selectedVillage.id,
+                          selectedCenterSlot.id,
+                          selectedCenterSlot.buildingGid!,
+                        ),
+                      )
+                    }
+                  >
+                    Upgrade building
+                  </button>
+                </>
+              ) : (
+                <div className="build-choice-list center-choice-list">
+                  {selectedCenterOptions.map((option) => (
+                    <button
+                      className="ghost-button build-choice"
+                      key={`${selectedCenterSlot.id}-${option.gid}`}
+                      onClick={() =>
+                        applyGameUpdate((current) =>
+                          queueCenterBuild(current, selectedVillage.id, selectedCenterSlot.id, option.gid),
+                        )
+                      }
+                    >
+                      {option.label} · {formatResourceStock(option.cost)}
+                    </button>
+                  ))}
+                  {!selectedCenterOptions.length ? (
+                    <p className="muted">No center building is unlocked for this lot yet.</p>
+                  ) : null}
+                </div>
+              )}
+            </div>
           </div>
-        </div>
+        )}
 
         <div className="construction-banner">
           <div className="construction-banner-header">
@@ -1052,20 +1376,214 @@ function App() {
     </section>
   )
 
-  return (
-    <main className={`shell ${immersiveSettlement ? 'immersive-shell' : ''}`}>
-      <header className={`topbar ${immersiveSettlement ? 'legends-topbar' : ''}`}>
-        <div className={`topbar-block ${immersiveSettlement ? 'hero-block' : ''}`}>
-          {immersiveSettlement ? (
-            <div className="hero-cluster">
-              <div className="hero-medallion">
-                <div className="hero-avatar">{humanPlayer.name.slice(0, 1).toUpperCase()}</div>
-                <span className="hero-level">{humanVillages.length}</span>
+  const renderImmersiveMap = () => (
+    <section className="legends-settlement legends-map-scene-shell">
+      <div className="legends-stage legends-map-stage">
+        <div className="scene-mode-switch map-mode-switch">
+          <button className="mode-pill active" onClick={() => setFocusedTileId(selectedVillage.tileId)}>
+            Focus {focusedTile ? `(${focusedTile.x}, ${focusedTile.y})` : 'tile'}
+          </button>
+          <button className="mode-pill" onClick={() => setFocusedTileId(selectedVillage.tileId)}>
+            Recenter on village
+          </button>
+        </div>
+
+        {immersiveSceneColumns}
+
+        <div className="legends-map-frame">
+          <div className="legends-map-frame-header">
+            <div>
+              <p className="eyebrow">Map</p>
+              <h2>Local world</h2>
+            </div>
+            <div className="legends-map-toolbar">
+              <div className="chip-row">
+                {availableMapRadiusOptions.map((radius) => (
+                  <button
+                    key={radius}
+                    className={`mode-pill map-chip ${mapRadius === radius ? 'active' : ''}`}
+                    onClick={() => setMapRadius(radius)}
+                  >
+                    Radius {radius}
+                  </button>
+                ))}
               </div>
-              <div className="hero-copy">
-                <p className="eyebrow">Village view</p>
-                <h1>{formatWorldTime(game.now)}</h1>
-                <span>{TRIBE_LABEL[humanPlayer.tribe]}</span>
+              <div className="chip-row">
+                <button className="secondary-button" onClick={() => shiftFocus(0, -1)}>
+                  North
+                </button>
+                <button className="secondary-button" onClick={() => shiftFocus(-1, 0)}>
+                  West
+                </button>
+                <button className="secondary-button" onClick={() => shiftFocus(1, 0)}>
+                  East
+                </button>
+                <button className="secondary-button" onClick={() => shiftFocus(0, 1)}>
+                  South
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="legends-map-frame-body">
+            <div
+              className="legends-map-grid"
+              style={{ gridTemplateColumns: `repeat(${mapRadius * 2 + 1}, minmax(0, 1fr))` }}
+            >
+              {viewportTiles.map((tile) => {
+                const occupant = tile.villageId ? game.villages[tile.villageId] : null
+                const occupiedByHuman = occupant?.ownerId === humanPlayer.id
+                return (
+                  <button
+                    key={tile.id}
+                    className={`legends-map-tile ${tileStateClass(tile, tile.id === focusedTile?.id, occupiedByHuman)}`}
+                    onClick={() => setFocusedTileId(tile.id)}
+                    title={`${tile.x},${tile.y} ${occupant ? occupant.name : getTileLabel(tile)}`}
+                  >
+                    <span className="legend-map-tile-coords">
+                      {tile.x},{tile.y}
+                    </span>
+                    <TileIllustration kind={getTileArtKind(tile, occupiedByHuman)} className="legend-map-art" />
+                    {occupant ? <span className="legend-map-occupant">{occupant.ownerId === humanPlayer.id ? 'Y' : 'R'}</span> : null}
+                  </button>
+                )
+              })}
+            </div>
+
+            <aside className="legends-mini-atlas">
+              <div className="legends-mini-atlas-card">
+                <p className="eyebrow">Mini-map</p>
+                <div className="atlas-shell map-mini-shell">
+                  <div
+                    className="atlas-grid"
+                    style={{ gridTemplateColumns: `repeat(${game.mapRadius * 2 + 1}, minmax(12px, 1fr))` }}
+                  >
+                    {worldOverviewTiles.map((tile) => {
+                      const occupant = tile.villageId ? game.villages[tile.villageId] : null
+                      const occupiedByHuman = occupant?.ownerId === humanPlayer.id
+                      return (
+                        <button
+                          key={`immersive-overview-${tile.id}`}
+                          className={`atlas-tile ${tileStateClass(tile, tile.id === focusedTile?.id, occupiedByHuman)}`}
+                          onClick={() => setFocusedTileId(tile.id)}
+                          title={`${tile.x},${tile.y} ${occupant ? occupant.name : getTileLabel(tile)}`}
+                        >
+                          <span>{tile.id}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              <div className="legends-mini-atlas-card">
+                <p className="eyebrow">Focus</p>
+                <div className="queue-list">
+                  <div className="queue-card">
+                    <strong>
+                      {focusedTile ? `${focusedTile.x}, ${focusedTile.y}` : 'Unknown'}
+                    </strong>
+                    <span>{focusedTile ? RESOURCE_PATTERNS[focusedTile.patternIndex].label : 'No tile selected'}</span>
+                    <span>{focusedVillage ? focusedVillage.name : 'Open terrain'}</span>
+                  </div>
+                </div>
+              </div>
+            </aside>
+          </div>
+
+          <div className="legends-map-footer">
+            <div className="summary-strip legends-map-summary">
+              <div>
+                <span>World tiles</span>
+                <strong>{worldOverviewTiles.length}</strong>
+              </div>
+              <div>
+                <span>Owned</span>
+                <strong>{worldStats.owned}</strong>
+              </div>
+              <div>
+                <span>Enemy</span>
+                <strong>{worldStats.enemy}</strong>
+              </div>
+              <div>
+                <span>Open</span>
+                <strong>{viewportStats.open}</strong>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="map-command-dock">
+          <article className="overlay-card map-intel-card">
+            <p className="eyebrow">Tile intel</p>
+            {focusedTile ? (
+              <>
+                <div className="inspector-art-card tile-art-card">
+                  <TileIllustration
+                    kind={getTileArtKind(focusedTile, focusedVillage?.ownerId === humanPlayer.id)}
+                    className="inspector-art"
+                  />
+                  <div>
+                    <strong>{focusedVillage ? focusedVillage.name : 'Unoccupied tile'}</strong>
+                    <span>{focusedVillage ? getTileLabel(focusedTile) : 'Expansion target'}</span>
+                  </div>
+                </div>
+                <div className="overlay-stat-row">
+                  <span>Coordinates</span>
+                  <strong>
+                    {focusedTile.x}, {focusedTile.y}
+                  </strong>
+                </div>
+                <div className="overlay-stat-row">
+                  <span>Pattern</span>
+                  <strong>{RESOURCE_PATTERNS[focusedTile.patternIndex].label}</strong>
+                </div>
+                {focusedVillageSummary ? (
+                  <div className="overlay-stat-row">
+                    <span>Loyalty</span>
+                    <strong>{Math.round(focusedVillageSummary.loyalty)}%</strong>
+                  </div>
+                ) : null}
+              </>
+            ) : null}
+          </article>
+
+          <article className="overlay-card map-action-card">
+            <div className="overlay-card-header">
+              <p className="eyebrow">Orders</p>
+              <span>{focusedVillage ? (focusedVillage.ownerId === humanPlayer.id ? 'Trade' : 'War') : 'Settle'}</span>
+            </div>
+            {renderMapActionContent()}
+          </article>
+        </div>
+      </div>
+    </section>
+  )
+
+  return (
+    <main className={`shell ${immersiveMode ? 'immersive-shell' : ''}`}>
+      <header className={`topbar ${immersiveMode ? 'legends-topbar' : ''}`}>
+        <div className={`topbar-block ${immersiveMode ? 'hero-block' : ''}`}>
+          {immersiveMode ? (
+            <div className="hero-shell">
+              <div className="hero-side-stack">
+                <div className="server-pill">{formatWorldTime(game.now)}</div>
+                <div className="brand-plaque">
+                  <strong>TRAVIAN</strong>
+                  <span>Legends offline</span>
+                </div>
+              </div>
+
+              <div className="hero-cluster">
+                <div className="hero-medallion">
+                  <div className="hero-avatar">{humanPlayer.name.slice(0, 1).toUpperCase()}</div>
+                  <span className="hero-level">{humanVillages.length}</span>
+                </div>
+                <div className="hero-copy">
+                  <p className="eyebrow">Village view</p>
+                  <h1>{formatWorldTime(game.now)}</h1>
+                  <span>{TRIBE_LABEL[humanPlayer.tribe]}</span>
+                </div>
               </div>
             </div>
           ) : (
@@ -1075,8 +1593,8 @@ function App() {
             </>
           )}
         </div>
-        <div className={`topbar-block grow ${immersiveSettlement ? 'hud-center-block' : ''}`}>
-          {immersiveSettlement ? (
+        <div className={`topbar-block grow ${immersiveMode ? 'hud-center-block' : ''}`}>
+          {immersiveMode ? (
             <div className="hud-main-stack">
               <nav className="hud-nav-strip">
                 {(['settlement', 'map', 'army', 'reports'] as const).map((tabId) => (
@@ -1100,10 +1618,23 @@ function App() {
               </nav>
               <div className="resource-strip legends-resource-strip">
                 {RESOURCE_KEYS.map((key) => (
-                  <div className="resource-pill" key={key}>
-                    <span className="resource-key">{key}</span>
+                  <div className="resource-pill legends-resource-pill" key={key}>
+                    <div className="resource-pill-head">
+                      <ResourceIllustration kind={key} className="hud-resource-art" />
+                      <span className="resource-key">{key}</span>
+                    </div>
                     <strong>{quantityLabel(selectedVillage.resources[key])}</strong>
                     <small>{quantityLabel(villageSummary.storage[key])} cap</small>
+                    <div className="resource-meter">
+                      <span
+                        style={{
+                          width: `${Math.max(
+                            6,
+                            Math.min(100, (selectedVillage.resources[key] / Math.max(1, villageSummary.storage[key])) * 100),
+                          )}%`,
+                        }}
+                      />
+                    </div>
                   </div>
                 ))}
               </div>
@@ -1120,8 +1651,18 @@ function App() {
             </div>
           )}
         </div>
-        <div className={`topbar-block controls ${immersiveSettlement ? 'legends-controls' : ''}`}>
-          <div className={`skip-grid ${immersiveSettlement ? 'legends-skip-grid' : ''}`}>
+        <div className={`topbar-block controls ${immersiveMode ? 'legends-controls' : ''}`}>
+          {immersiveMode ? (
+            <div className="topbar-utility-strip">
+              <div className="utility-orbs">
+                <button className="utility-orb">?</button>
+                <button className="utility-orb">⚙</button>
+                <button className="utility-orb">×</button>
+              </div>
+              <div className="coin-medallion">T</div>
+            </div>
+          ) : null}
+          <div className={`skip-grid ${immersiveMode ? 'legends-skip-grid' : ''}`}>
             {[900, 3600, 21600, 86400].map((seconds) => (
               <button
                 key={seconds}
@@ -1152,8 +1693,8 @@ function App() {
         </div>
       </header>
 
-      <section className={`frame ${immersiveSettlement ? 'immersive-frame' : ''}`}>
-        {!immersiveSettlement ? (
+      <section className={`frame ${immersiveMode ? 'immersive-frame' : ''}`}>
+        {!immersiveMode ? (
         <aside className="sidebar">
           <div className="panel">
             <p className="eyebrow">Ruler</p>
@@ -1301,8 +1842,8 @@ function App() {
         </aside>
         ) : null}
 
-        <section className={`content ${immersiveSettlement ? 'immersive-content' : ''}`}>
-          {!immersiveSettlement ? (
+        <section className={`content ${immersiveMode ? 'immersive-content' : ''}`}>
+          {!immersiveMode ? (
           <nav className="tab-row">
             {(['settlement', 'map', 'army', 'reports'] as const).map((tabId) => (
               <button
@@ -1317,7 +1858,7 @@ function App() {
           ) : null}
 
           {tab === 'settlement' ? (
-            immersiveSettlement ? (
+            immersiveMode ? (
               renderImmersiveSettlement()
             ) : (
             <section className="content-grid">
@@ -1629,6 +2170,9 @@ function App() {
           ) : null}
 
           {tab === 'map' ? (
+            immersiveMode ? (
+              renderImmersiveMap()
+            ) : (
             <section className="content-grid">
               <div className="panel wide">
                 <div className="panel-header">
@@ -2009,6 +2553,7 @@ function App() {
                 ) : null}
               </div>
             </section>
+            )
           ) : null}
 
           {tab === 'army' ? (

@@ -384,6 +384,7 @@
 }
 
 .legends-topbar {
+  position: relative;
   border-radius: 34px;
   border: 2px solid rgba(110, 78, 45, 0.34);
   background:
@@ -394,9 +395,60 @@
     inset 0 1px 0 rgba(255, 246, 226, 0.72);
 }
 
+.legends-topbar::before {
+  content: '';
+  position: absolute;
+  inset: 6px;
+  border-radius: 28px;
+  border: 1px solid rgba(255, 246, 227, 0.34);
+  pointer-events: none;
+}
+
 .hero-block {
   display: flex;
   align-items: center;
+}
+
+.hero-shell {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+}
+
+.hero-side-stack {
+  display: grid;
+  gap: 10px;
+}
+
+.server-pill {
+  justify-self: flex-start;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: rgba(98, 70, 40, 0.72);
+  color: #fff1d8;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.brand-plaque {
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(113, 80, 45, 0.22);
+  background: linear-gradient(180deg, rgba(248, 239, 218, 0.98), rgba(232, 215, 183, 0.98));
+  box-shadow: inset 0 1px 0 rgba(255, 250, 239, 0.56);
+}
+
+.brand-plaque strong,
+.brand-plaque span {
+  display: block;
+}
+
+.brand-plaque span {
+  color: var(--ink-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 11px;
 }
 
 .hero-cluster {
@@ -512,10 +564,81 @@
   box-shadow: inset 0 1px 0 rgba(255, 249, 237, 0.52);
 }
 
+.legends-resource-pill {
+  position: relative;
+}
+
+.resource-pill-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.hud-resource-art {
+  width: 18px;
+  height: 18px;
+  display: block;
+}
+
+.resource-meter {
+  height: 8px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(81, 60, 33, 0.18);
+}
+
+.resource-meter span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, rgba(118, 157, 54, 0.98), rgba(86, 125, 40, 0.98));
+  box-shadow: inset 0 1px 0 rgba(255, 245, 210, 0.36);
+}
+
 .legends-controls .secondary-button,
 .legends-controls .primary-button {
   border-radius: 18px;
   padding-inline: 18px;
+}
+
+.topbar-utility-strip {
+  display: flex;
+  justify-content: flex-end;
+  gap: 14px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.utility-orbs {
+  display: flex;
+  gap: 8px;
+}
+
+.utility-orb {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(180deg, rgba(245, 234, 213, 0.98), rgba(217, 191, 151, 0.98));
+  border: 1px solid rgba(110, 79, 46, 0.24);
+  color: rgba(79, 57, 31, 0.92);
+  box-shadow: inset 0 1px 0 rgba(255, 248, 232, 0.52);
+}
+
+.coin-medallion {
+  width: 86px;
+  height: 86px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(circle at 34% 28%, rgba(255, 236, 155, 0.98), rgba(214, 151, 52, 0.98) 66%, rgba(137, 88, 26, 0.98) 100%);
+  color: rgba(119, 72, 20, 0.92);
+  font-size: 44px;
+  font-weight: 700;
+  box-shadow:
+    0 14px 28px rgba(63, 41, 19, 0.2),
+    inset 0 2px 0 rgba(255, 245, 201, 0.58);
 }
 
 .legends-controls .secondary-button {
@@ -617,10 +740,11 @@
 
 .scene-overlay-column.right {
   right: 18px;
-  width: 286px;
+  width: 300px;
 }
 
 .overlay-card {
+  position: relative;
   border-radius: 26px;
   padding: 18px 18px 16px;
   border: 2px solid rgba(110, 79, 48, 0.24);
@@ -632,8 +756,40 @@
     inset 0 1px 0 rgba(255, 249, 236, 0.6);
 }
 
+.overlay-card::before,
+.overlay-card::after {
+  content: '';
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  pointer-events: none;
+}
+
+.overlay-card::before {
+  top: 8px;
+  left: 8px;
+  border-top: 2px solid rgba(127, 91, 53, 0.36);
+  border-left: 2px solid rgba(127, 91, 53, 0.36);
+  border-top-left-radius: 12px;
+}
+
+.overlay-card::after {
+  right: 8px;
+  bottom: 8px;
+  border-right: 2px solid rgba(127, 91, 53, 0.36);
+  border-bottom: 2px solid rgba(127, 91, 53, 0.36);
+  border-bottom-right-radius: 12px;
+}
+
 .overlay-card h2 {
   margin: 0 0 10px;
+}
+
+.village-name-small {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--ink-soft);
+  font-weight: 700;
 }
 
 .overlay-card-header {
@@ -741,9 +897,44 @@
   display: block;
 }
 
+.floating-info-card {
+  position: absolute;
+  z-index: 6;
+  min-width: 180px;
+  border-radius: 18px;
+  padding: 16px 18px;
+  border: 1px solid rgba(219, 213, 200, 0.6);
+  background: rgba(252, 249, 244, 0.92);
+  box-shadow: 0 14px 28px rgba(59, 40, 19, 0.12);
+}
+
+.production-floating-card {
+  right: 314px;
+  top: 334px;
+  width: 176px;
+}
+
+.troops-floating-card {
+  right: 314px;
+  top: 488px;
+  width: 176px;
+}
+
+.floating-info-list {
+  display: grid;
+  gap: 8px;
+}
+
+.floating-info-row {
+  display: grid;
+  grid-template-columns: 24px 1fr auto;
+  align-items: center;
+  gap: 8px;
+}
+
 .legends-landscape {
   position: absolute;
-  inset: 118px 282px 150px 282px;
+  inset: 104px 318px 154px 304px;
   border-radius: 34px;
   overflow: hidden;
 }
@@ -866,6 +1057,106 @@
   height: 194px;
 }
 
+.legends-center-landscape {
+  position: absolute;
+  inset: 104px 318px 154px 304px;
+  border-radius: 34px;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 48%, rgba(214, 221, 190, 0.98), rgba(159, 177, 108, 0.98) 58%, rgba(121, 141, 78, 0.98) 100%);
+}
+
+.center-ring-water {
+  position: absolute;
+  inset: 8%;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(120, 167, 201, 0) 58%, rgba(114, 168, 199, 0.98) 59%, rgba(207, 234, 247, 0.98) 68%, rgba(114, 168, 199, 0) 73%);
+}
+
+.center-ring-ground {
+  position: absolute;
+  inset: 13%;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(182, 205, 126, 0.98), rgba(156, 183, 102, 0.98) 72%, rgba(132, 156, 82, 0.98) 100%);
+  box-shadow: inset 0 0 0 2px rgba(118, 142, 71, 0.22);
+}
+
+.center-paths {
+  position: absolute;
+  inset: 18%;
+  border-radius: 50%;
+  background:
+    linear-gradient(90deg, rgba(221, 207, 174, 0) 48%, rgba(221, 207, 174, 0.86) 48.8%, rgba(221, 207, 174, 0.86) 51.2%, rgba(221, 207, 174, 0) 52%),
+    linear-gradient(45deg, rgba(221, 207, 174, 0) 48%, rgba(221, 207, 174, 0.82) 49%, rgba(221, 207, 174, 0.82) 51%, rgba(221, 207, 174, 0) 52%),
+    linear-gradient(-45deg, rgba(221, 207, 174, 0) 48%, rgba(221, 207, 174, 0.82) 49%, rgba(221, 207, 174, 0.82) 51%, rgba(221, 207, 174, 0) 52%);
+  opacity: 0.88;
+}
+
+.center-ring-node {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  border: 4px solid rgba(201, 194, 162, 0.82);
+  background: radial-gradient(circle at 38% 30%, rgba(244, 241, 233, 0.98), rgba(213, 201, 168, 0.98) 72%, rgba(173, 153, 110, 0.98) 100%);
+  box-shadow: 0 12px 24px rgba(60, 40, 20, 0.18);
+  z-index: 3;
+}
+
+.center-ring-node.empty {
+  background: radial-gradient(circle at 38% 30%, rgba(226, 214, 183, 0.98), rgba(181, 165, 118, 0.98) 72%, rgba(153, 134, 91, 0.98) 100%);
+}
+
+.center-ring-node.active {
+  box-shadow:
+    0 0 0 4px rgba(255, 246, 214, 0.86),
+    0 14px 28px rgba(60, 40, 20, 0.24);
+}
+
+.center-node-art {
+  width: 44px;
+  height: 44px;
+  display: block;
+}
+
+.empty-node-count {
+  position: absolute;
+  bottom: -8px;
+  right: 2px;
+  min-width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: rgba(119, 100, 68, 0.9);
+  color: #fff6dd;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.center-tooltip-card {
+  position: absolute;
+  left: 50%;
+  bottom: 12%;
+  transform: translateX(-50%);
+  width: min(420px, 60%);
+  z-index: 6;
+  padding: 18px 20px;
+  border-radius: 24px;
+  background: rgba(252, 249, 244, 0.94);
+  box-shadow: 0 16px 30px rgba(61, 42, 20, 0.18);
+  border: 1px solid rgba(217, 205, 178, 0.72);
+}
+
+.center-choice-list {
+  margin-top: 14px;
+}
+
 .resource-terrain {
   position: absolute;
   inset: 0;
@@ -963,10 +1254,10 @@
 
 .scene-tooltip {
   position: absolute;
-  left: 50%;
+  left: 44%;
   top: 12%;
-  transform: translateX(-8%);
-  width: min(390px, 46%);
+  transform: translateX(-50%);
+  width: min(344px, 40%);
   z-index: 6;
   padding: 16px 18px;
   border-radius: 26px;
@@ -1076,6 +1367,199 @@
 .construction-banner-row:first-child {
   padding-top: 0;
   border-top: 0;
+}
+
+.legends-map-stage {
+  min-height: 1120px;
+  background:
+    linear-gradient(180deg, rgba(145, 181, 215, 0.98) 0%, rgba(214, 229, 240, 0.98) 16%, rgba(180, 201, 142, 0.98) 16%, rgba(145, 170, 95, 0.98) 32%, rgba(97, 124, 62, 0.98) 100%);
+}
+
+.map-mode-switch {
+  gap: 10px;
+}
+
+.legends-map-frame {
+  position: absolute;
+  left: 300px;
+  right: 318px;
+  top: 118px;
+  padding: 18px;
+  border-radius: 28px;
+  border: 3px solid rgba(110, 78, 45, 0.34);
+  background:
+    linear-gradient(180deg, rgba(232, 218, 193, 0.98), rgba(197, 173, 138, 0.98)),
+    var(--panel-noise);
+  box-shadow:
+    0 18px 36px rgba(54, 36, 18, 0.22),
+    inset 0 1px 0 rgba(255, 248, 233, 0.56);
+  z-index: 4;
+}
+
+.legends-map-frame::before {
+  content: '';
+  position: absolute;
+  inset: 8px;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 246, 227, 0.42);
+  pointer-events: none;
+}
+
+.legends-map-frame-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  align-items: flex-start;
+  margin-bottom: 14px;
+}
+
+.legends-map-toolbar {
+  display: grid;
+  gap: 10px;
+  justify-items: end;
+}
+
+.map-chip {
+  padding-inline: 14px;
+}
+
+.legends-map-frame-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 182px;
+  gap: 14px;
+}
+
+.legends-map-grid {
+  border-radius: 18px;
+  overflow: hidden;
+  display: grid;
+  gap: 1px;
+  padding: 8px;
+  background: linear-gradient(180deg, rgba(135, 157, 77, 0.98), rgba(123, 147, 69, 0.98));
+  box-shadow:
+    inset 0 0 0 2px rgba(112, 135, 65, 0.82),
+    inset 0 0 0 10px rgba(202, 218, 150, 0.24);
+}
+
+.legends-map-tile {
+  position: relative;
+  min-height: 42px;
+  aspect-ratio: 1;
+  padding: 4px;
+  border: 0;
+  border-radius: 0;
+  background:
+    radial-gradient(circle at 50% 46%, rgba(214, 232, 155, 0.76), rgba(214, 232, 155, 0) 58%),
+    linear-gradient(180deg, rgba(210, 231, 151, 0.98), rgba(197, 221, 136, 0.98));
+  box-shadow: inset 0 0 0 1px rgba(154, 181, 91, 0.66);
+}
+
+.legends-map-tile.occupied {
+  background:
+    radial-gradient(circle at 50% 46%, rgba(233, 217, 158, 0.82), rgba(233, 217, 158, 0) 58%),
+    linear-gradient(180deg, rgba(219, 218, 162, 0.98), rgba(201, 200, 142, 0.98));
+}
+
+.legends-map-tile.human {
+  background:
+    radial-gradient(circle at 50% 46%, rgba(197, 230, 178, 0.82), rgba(197, 230, 178, 0) 58%),
+    linear-gradient(180deg, rgba(205, 229, 164, 0.98), rgba(177, 213, 136, 0.98));
+}
+
+.legends-map-tile.selected {
+  box-shadow:
+    inset 0 0 0 2px rgba(225, 144, 51, 0.92),
+    0 0 0 1px rgba(255, 250, 238, 0.62);
+  z-index: 2;
+}
+
+.legend-map-tile-coords {
+  position: absolute;
+  top: 3px;
+  left: 4px;
+  font-size: 9px;
+  line-height: 1;
+  color: rgba(66, 57, 35, 0.66);
+}
+
+.legend-map-art {
+  width: 28px;
+  height: 28px;
+  display: block;
+  margin: 8px auto 0;
+}
+
+.legend-map-occupant {
+  position: absolute;
+  right: 4px;
+  top: 4px;
+  min-width: 16px;
+  height: 16px;
+  padding-inline: 4px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: rgba(116, 76, 41, 0.92);
+  color: #fff6de;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.legends-mini-atlas {
+  display: grid;
+  gap: 12px;
+}
+
+.legends-mini-atlas-card {
+  border-radius: 18px;
+  padding: 12px;
+  background: rgba(255, 249, 239, 0.76);
+  border: 1px solid rgba(106, 76, 44, 0.16);
+}
+
+.map-mini-shell {
+  padding: 8px;
+}
+
+.legends-map-footer {
+  margin-top: 14px;
+}
+
+.legends-map-summary {
+  justify-content: space-between;
+}
+
+.legends-map-summary div {
+  background: rgba(255, 251, 243, 0.7);
+}
+
+.map-command-dock {
+  position: absolute;
+  left: 300px;
+  right: 318px;
+  bottom: 18px;
+  display: grid;
+  grid-template-columns: minmax(240px, 0.9fr) minmax(0, 1.1fr);
+  gap: 14px;
+  z-index: 5;
+}
+
+.map-intel-card,
+.map-action-card {
+  min-height: 240px;
+}
+
+.map-action-card .map-actions {
+  margin-top: 8px;
+}
+
+.map-action-card .action-stack {
+  margin-top: 10px;
+}
+
+.map-action-card label {
+  display: grid;
+  gap: 6px;
 }
 
 .content-grid {
@@ -1522,6 +2006,9 @@ select:focus {
   .scene-mode-switch,
   .scene-overlay-column,
   .legends-landscape,
+  .legends-center-landscape,
+  .legends-map-frame,
+  .map-command-dock,
   .construction-banner {
     position: relative;
     inset: auto;
@@ -1540,6 +2027,29 @@ select:focus {
   .legends-landscape {
     min-height: 760px;
     border-radius: 28px;
+  }
+
+  .legends-center-landscape {
+    min-height: 760px;
+    border-radius: 28px;
+  }
+
+  .legends-map-frame,
+  .map-command-dock {
+    left: auto;
+    right: auto;
+  }
+
+  .legends-map-frame-body,
+  .map-command-dock {
+    grid-template-columns: 1fr;
+  }
+
+  .floating-info-card {
+    position: relative;
+    top: auto;
+    right: auto;
+    width: auto;
   }
 
   .construction-banner {
@@ -1568,11 +2078,14 @@ select:focus {
   }
 
   .hero-cluster,
+  .hero-shell,
   .hud-nav-strip,
   .scene-mode-switch,
   .overlay-actions,
   .scene-tooltip-meta,
-  .construction-banner-header {
+  .construction-banner-header,
+  .topbar-utility-strip,
+  .legends-map-frame-header {
     flex-wrap: wrap;
   }
 
@@ -1596,9 +2109,25 @@ select:focus {
     min-height: 620px;
   }
 
+  .legends-center-landscape {
+    min-height: 620px;
+  }
+
+  .legends-map-stage {
+    min-height: auto;
+  }
+
   .scene-tooltip {
     left: 14px;
     right: 14px;
+    width: auto;
+    transform: none;
+  }
+
+  .center-tooltip-card {
+    left: 14px;
+    right: 14px;
+    bottom: 14px;
     width: auto;
     transform: none;
   }
@@ -1631,5 +2160,9 @@ select:focus {
   .scene-slot-art {
     width: 40px;
     height: 40px;
+  }
+
+  .legends-map-grid {
+    overflow: auto;
   }
 }
